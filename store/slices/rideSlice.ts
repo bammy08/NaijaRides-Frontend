@@ -45,7 +45,7 @@ export const cancelRide = createAsyncThunk(
   'rides/cancel',
   async (rideId: string, thunkAPI) => {
     try {
-      const response = await api.patch(`/rides/${rideId}/cancel`);
+      const response = await api.patch(`/rides/cancel/${rideId}`);
       return response.data;
     } catch (err: any) {
       return thunkAPI.rejectWithValue(
