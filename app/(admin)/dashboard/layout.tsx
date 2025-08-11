@@ -4,6 +4,7 @@ import React, { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppSelector } from '@/store/hooks';
 import Sidebar from '@/components/admin/Sidebar';
+import Navbar from '@/components/Navbar';
 
 export default function AdminDashboardLayout({
   children,

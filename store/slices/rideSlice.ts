@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import api from '@/lib/axios';
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 
-type FormData = {
+type Ride = {
+  _id: string;
   fromCity: string;
   toCity: string;
   pickupPoint: string;
@@ -13,6 +14,26 @@ type FormData = {
   distance?: number;
 };
 
+type FormData = Omit<Ride, '_id'>;
+
+interface RideState {
+  allRides: Ride[];
+  driverRides: Ride[];
+  loading: boolean;
+  error: string | null;
+  success: boolean;
+}
+
+// ✅ Initial state with explicit typing
+const initialState: RideState = {
+  allRides: [],
+  driverRides: [],
+  loading: false,
+  error: null,
+  success: false,
+};
+
+// PUBLISH RIDE
 export const publishRide = createAsyncThunk(
   'rides/publish',
   async (rideData: FormData, thunkAPI) => {
@@ -27,12 +48,31 @@ export const publishRide = createAsyncThunk(
   }
 );
 
+// UPDATE RIDE
+export const updateRide = createAsyncThunk(
+  'rides/update',
+  async (
+    { rideId, rideData }: { rideId: string; rideData: Partial<FormData> },
+    thunkAPI
+  ) => {
+    try {
+      const response = await api.put(`/rides/${rideId}`, rideData);
+      return response.data.ride as Ride; // returns updated ride
+    } catch (err: any) {
+      return thunkAPI.rejectWithValue(
+        err.response?.data?.message || 'Failed to update ride'
+      );
+    }
+  }
+);
+
+// FETCH DRIVER RIDES
 export const fetchDriverRides = createAsyncThunk(
   'rides/driverRides',
   async (_, thunkAPI) => {
     try {
       const response = await api.get('/rides/my-rides');
-      return response.data;
+      return response.data as Ride[];
     } catch (err: any) {
       return thunkAPI.rejectWithValue(
         err.response?.data?.message || 'Failed to fetch driver rides'
@@ -41,6 +81,7 @@ export const fetchDriverRides = createAsyncThunk(
   }
 );
 
+// CANCEL RIDE
 export const cancelRide = createAsyncThunk(
   'rides/cancel',
   async (rideId: string, thunkAPI) => {
@@ -55,6 +96,7 @@ export const cancelRide = createAsyncThunk(
   }
 );
 
+// COMPLETE RIDE
 export const completeRide = createAsyncThunk(
   'rides/complete',
   async (rideId: string, thunkAPI) => {
@@ -69,12 +111,13 @@ export const completeRide = createAsyncThunk(
   }
 );
 
+// FETCH ALL RIDES (Admin)
 export const fetchAllRides = createAsyncThunk(
   'rides/fetchAll',
   async (_, thunkAPI) => {
     try {
       const response = await api.get('/rides/admin');
-      return response.data;
+      return response.data as Ride[];
     } catch (err: any) {
       return thunkAPI.rejectWithValue(
         err.response?.data?.message || 'Failed to fetch all rides'
@@ -85,13 +128,7 @@ export const fetchAllRides = createAsyncThunk(
 
 const rideSlice = createSlice({
   name: 'rides',
-  initialState: {
-    allRides: [],
-    driverRides: [],
-    loading: false,
-    error: null as string | null,
-    success: false,
-  },
+  initialState,
   reducers: {
     clearRideState: (state) => {
       state.loading = false;
@@ -116,15 +153,36 @@ const rideSlice = createSlice({
         state.error = action.payload as string;
       })
 
+      // UPDATE
+      .addCase(updateRide.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        state.success = false;
+      })
+      .addCase(updateRide.fulfilled, (state, action: PayloadAction<Ride>) => {
+        state.loading = false;
+        state.success = true;
+        state.driverRides = state.driverRides.map((ride) =>
+          ride._id === action.payload._id ? action.payload : ride
+        );
+      })
+      .addCase(updateRide.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+
       // DRIVER RIDES
       .addCase(fetchDriverRides.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(fetchDriverRides.fulfilled, (state, action) => {
-        state.loading = false;
-        state.driverRides = action.payload;
-      })
+      .addCase(
+        fetchDriverRides.fulfilled,
+        (state, action: PayloadAction<Ride[]>) => {
+          state.loading = false;
+          state.driverRides = action.payload;
+        }
+      )
       .addCase(fetchDriverRides.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
@@ -163,10 +221,13 @@ const rideSlice = createSlice({
         state.loading = true;
         state.error = null;
       })
-      .addCase(fetchAllRides.fulfilled, (state, action) => {
-        state.loading = false;
-        state.allRides = action.payload;
-      })
+      .addCase(
+        fetchAllRides.fulfilled,
+        (state, action: PayloadAction<Ride[]>) => {
+          state.loading = false;
+          state.allRides = action.payload;
+        }
+      )
       .addCase(fetchAllRides.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;

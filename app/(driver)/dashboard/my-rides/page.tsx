@@ -8,6 +8,7 @@ import {
   cancelRide,
   completeRide,
   clearRideState,
+  updateRide, // Import the updateRide action
 } from '@/store/slices/rideSlice';
 import { AppDispatch, RootState } from '@/store/store';
 import { Button } from '@/components/ui/button';
@@ -19,9 +20,12 @@ import {
   Users,
   XCircle,
   CheckCircle,
+  Edit,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
+import Link from 'next/link';
+import { format } from 'date-fns';
 
 const DriverRides = () => {
   const dispatch = useDispatch<AppDispatch>();
@@ -30,6 +34,8 @@ const DriverRides = () => {
   );
   const [activeTab, setActiveTab] = useState('all');
   const [expandedRide, setExpandedRide] = useState<string | null>(null);
+  const [editingRideId, setEditingRideId] = useState<string | null>(null);
+  const [editFormData, setEditFormData] = useState<any>({});
 
   useEffect(() => {
     dispatch(fetchDriverRides());
@@ -40,6 +46,7 @@ const DriverRides = () => {
       toast.success('Action completed successfully');
       dispatch(fetchDriverRides()); // refresh list
       dispatch(clearRideState());
+      setEditingRideId(null); // Close edit form after success
     }
     if (error) {
       toast.error(error);
@@ -59,8 +66,55 @@ const DriverRides = () => {
     }
   };
 
+  const handleStartEdit = (ride: any) => {
+    setEditingRideId(ride._id);
+    setEditFormData({
+      fromCity: ride.fromCity,
+      toCity: ride.toCity,
+      departureTime: format(new Date(ride.departureTime), "yyyy-MM-dd'T'HH:mm"),
+      availableSeats: ride.availableSeats,
+      pricePerSeat: ride.pricePerSeat,
+      pickupPoint: ride.pickupPoint,
+      dropoffPoint: ride.dropoffPoint,
+    });
+    setExpandedRide(ride._id); // Ensure the ride is expanded
+  };
+
+  const handleCancelEdit = () => {
+    setEditingRideId(null);
+    setEditFormData({});
+  };
+
+  const handleEditChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setEditFormData({
+      ...editFormData,
+      [name]:
+        name === 'availableSeats' || name === 'pricePerSeat'
+          ? Number(value)
+          : value,
+    });
+  };
+
+  const handleSubmitEdit = (rideId: string) => {
+    {
+      dispatch(
+        updateRide({
+          rideId,
+          rideData: {
+            ...editFormData,
+            departureTime: new Date(editFormData.departureTime).toISOString(),
+          },
+        })
+      );
+    }
+  };
+
   const toggleRideDetails = (rideId: string) => {
     setExpandedRide(expandedRide === rideId ? null : rideId);
+    if (editingRideId === rideId) {
+      handleCancelEdit();
+    }
   };
 
   const filteredRides = driverRides.filter((ride: any) => {
@@ -147,14 +201,17 @@ const DriverRides = () => {
           <h3 className="text-xl font-bold text-gray-800 mb-2">
             No rides found
           </h3>
-          <p className="text-gray-600 max-w-md mx-auto">
+          <p className="text-gray-600 max-w-md mx-auto mb-3">
             {activeTab === 'all'
               ? "You haven't published any rides yet."
               : `You don't have any ${activeTab} rides.`}
           </p>
-          <Button className="mt-4 bg-gradient-to-r from-blue-600 to-indigo-700">
+          <Link
+            href={'/publish'}
+            className="px-4 py-2 rounded text-white bg-gradient-to-r from-blue-600 to-indigo-700"
+          >
             Publish Your First Ride
-          </Button>
+          </Link>
         </div>
       )}
 
@@ -236,46 +293,177 @@ const DriverRides = () => {
                       className="border-t border-gray-100"
                     >
                       <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                          <h3 className="font-bold text-gray-700 mb-2 flex items-center gap-2">
-                            <MapPin className="w-4 h-4 text-blue-500" /> Pickup
-                            Details
-                          </h3>
-                          <p className="text-gray-800">{ride.pickupPoint}</p>
-                        </div>
-                        <div>
-                          <h3 className="font-bold text-gray-700 mb-2 flex items-center gap-2">
-                            <MapPin className="w-4 h-4 text-blue-500" /> Dropoff
-                            Details
-                          </h3>
-                          <p className="text-gray-800">{ride.dropoffPoint}</p>
-                        </div>
+                        {editingRideId === ride._id ? (
+                          /* Edit Form */
+                          <>
+                            <div className="md:col-span-2">
+                              <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+                                <Edit className="w-5 h-5 text-blue-500" /> Edit
+                                Ride Details
+                              </h3>
+                            </div>
 
-                        <div className="md:col-span-2 pt-4">
-                          <div className="flex flex-wrap gap-3">
-                            {ride.status === 'active' && (
-                              <>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                From City
+                              </label>
+                              <input
+                                type="text"
+                                name="fromCity"
+                                value={editFormData.fromCity || ''}
+                                onChange={handleEditChange}
+                                className="w-full border border-gray-300 p-2 rounded-lg"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                To City
+                              </label>
+                              <input
+                                type="text"
+                                name="toCity"
+                                value={editFormData.toCity || ''}
+                                onChange={handleEditChange}
+                                className="w-full border border-gray-300 p-2 rounded-lg"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Departure Time
+                              </label>
+                              <input
+                                type="datetime-local"
+                                name="departureTime"
+                                value={editFormData.departureTime || ''}
+                                onChange={handleEditChange}
+                                className="w-full border border-gray-300 p-2 rounded-lg"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Available Seats
+                              </label>
+                              <input
+                                type="number"
+                                name="availableSeats"
+                                value={editFormData.availableSeats || ''}
+                                onChange={handleEditChange}
+                                className="w-full border border-gray-300 p-2 rounded-lg"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Price Per Seat (₦)
+                              </label>
+                              <input
+                                type="number"
+                                name="pricePerSeat"
+                                value={editFormData.pricePerSeat || ''}
+                                onChange={handleEditChange}
+                                className="w-full border border-gray-300 p-2 rounded-lg"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Pickup Point
+                              </label>
+                              <input
+                                type="text"
+                                name="pickupPoint"
+                                value={editFormData.pickupPoint || ''}
+                                onChange={handleEditChange}
+                                className="w-full border border-gray-300 p-2 rounded-lg"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Dropoff Point
+                              </label>
+                              <input
+                                type="text"
+                                name="dropoffPoint"
+                                value={editFormData.dropoffPoint || ''}
+                                onChange={handleEditChange}
+                                className="w-full border border-gray-300 p-2 rounded-lg"
+                              />
+                            </div>
+
+                            <div className="md:col-span-2 pt-4 flex justify-end gap-3">
+                              <Button
+                                variant="outline"
+                                onClick={handleCancelEdit}
+                                disabled={loading}
+                              >
+                                Cancel
+                              </Button>
+                              <Button
+                                onClick={() => handleSubmitEdit(ride._id)}
+                                disabled={loading}
+                              >
+                                {loading ? 'Saving...' : 'Save Changes'}
+                              </Button>
+                            </div>
+                          </>
+                        ) : (
+                          /* Ride Details */
+                          <>
+                            <div>
+                              <h3 className="font-bold text-gray-700 mb-2 flex items-center gap-2">
+                                <MapPin className="w-4 h-4 text-blue-500" />{' '}
+                                Pickup Details
+                              </h3>
+                              <p className="text-gray-800">
+                                {ride.pickupPoint}
+                              </p>
+                            </div>
+                            <div>
+                              <h3 className="font-bold text-gray-700 mb-2 flex items-center gap-2">
+                                <MapPin className="w-4 h-4 text-blue-500" />{' '}
+                                Dropoff Details
+                              </h3>
+                              <p className="text-gray-800">
+                                {ride.dropoffPoint}
+                              </p>
+                            </div>
+
+                            <div className="md:col-span-2 pt-4">
+                              <div className="flex flex-wrap gap-3">
+                                {ride.status === 'active' && (
+                                  <>
+                                    <Button
+                                      variant="destructive"
+                                      className="gap-2"
+                                      onClick={() => handleCancel(ride._id)}
+                                    >
+                                      <XCircle className="w-4 h-4" /> Cancel
+                                      Ride
+                                    </Button>
+                                    <Button
+                                      variant="secondary"
+                                      className="gap-2"
+                                      onClick={() => handleComplete(ride._id)}
+                                    >
+                                      <CheckCircle className="w-4 h-4" /> Mark
+                                      as Completed
+                                    </Button>
+                                  </>
+                                )}
                                 <Button
-                                  variant="destructive"
-                                  className="gap-2"
-                                  onClick={() => handleCancel(ride._id)}
+                                  variant="outline"
+                                  onClick={() => handleStartEdit(ride)}
                                 >
-                                  <XCircle className="w-4 h-4" /> Cancel Ride
+                                  Edit Details
                                 </Button>
-                                <Button
-                                  variant="secondary"
-                                  className="gap-2"
-                                  onClick={() => handleComplete(ride._id)}
-                                >
-                                  <CheckCircle className="w-4 h-4" /> Mark as
-                                  Completed
-                                </Button>
-                              </>
-                            )}
-                            <Button variant="outline">View Bookings</Button>
-                            <Button variant="outline">Edit Details</Button>
-                          </div>
-                        </div>
+                              </div>
+                            </div>
+                          </>
+                        )}
                       </div>
                     </motion.div>
                   )}

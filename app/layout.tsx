@@ -4,6 +4,7 @@ import './globals.css';
 import { Providers } from '@/store/Providers';
 import { Toaster } from 'sonner';
 import 'leaflet/dist/leaflet.css';
+import Navbar from '@/components/Navbar';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -30,7 +31,10 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <Providers>{children}</Providers>
+        <Providers>
+          <Navbar />
+          {children}
+        </Providers>
         <Toaster position="top-right" richColors />
       </body>
     </html>
